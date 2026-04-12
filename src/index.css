@@ -1,0 +1,199 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;500;600;700&family=Philosopher:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Serif+Tamil:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 5%;
+    --foreground: 43 67% 93%;
+
+    --card: 0 100% 12%;
+    --card-foreground: 43 67% 93%;
+
+    --popover: 0 100% 12%;
+    --popover-foreground: 43 67% 93%;
+
+    --primary: 40 66% 48%;
+    --primary-foreground: 0 0% 5%;
+
+    --secondary: 0 100% 12%;
+    --secondary-foreground: 43 67% 93%;
+
+    --muted: 0 50% 15%;
+    --muted-foreground: 40 30% 60%;
+
+    --accent: 0 72% 38%;
+    --accent-foreground: 43 67% 93%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 40 40% 25%;
+    --input: 0 50% 18%;
+    --ring: 40 66% 48%;
+
+    --radius: 0.5rem;
+
+    /* Wedding-specific tokens */
+    --wedding-deep-red: 0 100% 12%;
+    --wedding-vermillion: 4 63% 46%;
+    --wedding-gold: 40 66% 48%;
+    --wedding-gold-light: 43 85% 70%;
+    --wedding-ivory: 43 67% 93%;
+    --wedding-cream: 40 70% 92%;
+    --wedding-maroon: 0 100% 15%;
+    --wedding-dark: 0 0% 5%;
+
+    --gradient-hero: linear-gradient(180deg, hsl(230 40% 5%) 0%, hsl(240 60% 8%) 50%, hsl(10 60% 15%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(40 66% 48%), hsl(43 85% 70%), hsl(40 66% 48%));
+    --gradient-section: linear-gradient(180deg, hsl(0 100% 12%) 0%, hsl(0 0% 5%) 100%);
+    --shadow-gold: 0 0 30px hsl(40 66% 48% / 0.3);
+    --shadow-glow: 0 0 60px hsl(40 66% 48% / 0.15);
+    --text-shadow-gold: 0 0 20px hsl(40 66% 48% / 0.5);
+
+    --font-display: 'Cinzel Decorative', serif;
+    --font-heading: 'Cinzel', serif;
+    --font-subtext: 'Philosopher', serif;
+    --font-body: 'Lora', serif;
+    --font-tamil: 'Noto Serif Tamil', serif;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    overflow-x: hidden;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-heading {
+    font-family: var(--font-heading);
+  }
+  .font-subtext {
+    font-family: var(--font-subtext);
+  }
+  .font-body {
+    font-family: var(--font-body);
+  }
+  .font-tamil {
+    font-family: var(--font-tamil);
+  }
+
+  .text-gold-gradient {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gold-glow {
+    text-shadow: var(--text-shadow-gold);
+  }
+
+  .section-gradient {
+    background: var(--gradient-section);
+  }
+
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+
+  .gold-border {
+    border: 1px solid hsl(var(--wedding-gold) / 0.4);
+  }
+
+  .gold-border-strong {
+    border: 2px solid hsl(var(--wedding-gold) / 0.6);
+  }
+}
+
+/* Scroll progress bar */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--gradient-gold);
+  z-index: 9999;
+  transition: width 0.1s linear;
+}
+
+/* Oil lamp / deepam animations */
+@keyframes flame-flicker {
+  0%, 100% { transform: scaleY(1) scaleX(1); opacity: 1; }
+  25% { transform: scaleY(1.1) scaleX(0.9); opacity: 0.85; }
+  50% { transform: scaleY(0.95) scaleX(1.05); opacity: 0.95; }
+  75% { transform: scaleY(1.05) scaleX(0.95); opacity: 0.9; }
+}
+
+@keyframes lamp-sway {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@keyframes float-up {
+  0% { opacity: 0; transform: translateY(40px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slow-zoom {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.1); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px hsl(40 66% 48% / 0.2); }
+  50% { box-shadow: 0 0 40px hsl(40 66% 48% / 0.4); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes float-lantern {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(var(--float-x), -100vh) scale(0.8); opacity: 0; }
+}
+
+@keyframes scroll-indicator {
+  0% { opacity: 1; transform: translateY(0); }
+  50% { opacity: 0.5; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-flame { animation: flame-flicker 0.8s ease-in-out infinite; }
+.animate-lamp-sway { animation: lamp-sway 4s ease-in-out infinite; }
+.animate-slow-zoom { animation: slow-zoom 20s ease-in-out infinite alternate; }
+.animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+.animate-twinkle { animation: twinkle 2s ease-in-out infinite; }
+.animate-float-lantern { 
+  animation: float-lantern var(--float-duration) ease-in infinite;
+  will-change: transform, opacity;
+}
+.animate-scroll-indicator { animation: scroll-indicator 2s ease-in-out infinite; }
+
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+.reveal-on-scroll.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
