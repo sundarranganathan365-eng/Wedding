@@ -53,41 +53,53 @@ const HeroSection = () => {
 
     const loadImages = async () => {
       let loadedCount = 0;
+      
+      // Dynamic memory scaling: Skip frames on mobile to prevent lag and RAM exhaustion
+      const isMobile = window.innerWidth < 768;
+      const step = isMobile ? 3 : 1; 
+      
+      const indicesToLoad: number[] = [];
+      for (let i = 1; i <= FRAME_COUNT; i += step) {
+        indicesToLoad.push(i);
+      }
+      const totalToLoad = indicesToLoad.length;
 
       const fetchImage = async (idx: number) => {
         try {
           const img = new Image();
           img.src = getFrameUrl(idx);
-          await new Promise((resolve, reject) => {
+          await new Promise((resolve) => {
             img.onload = () => {
               if (!isCancelled) {
                 framesRef.current[idx] = img;
                 loadedCount++;
-                setLoadingProgress(Math.round((loadedCount / FRAME_COUNT) * 100));
+                setLoadingProgress(Math.round((loadedCount / totalToLoad) * 100));
               }
-              resolve(true);
+              resolve(true); // Always resolve so Promise.all doesn't crash on individual timeout
             };
-            img.onerror = reject;
+            img.onerror = () => resolve(false);
           });
         } catch (e) {
           console.warn(`Failed to preload frame ${idx}`, e);
         }
       };
 
-      // Progressive caching: priority stream
-      const batch1 = [];
-      for (let i = 1; i <= 30; i++) batch1.push(fetchImage(i));
+      // 1. Force fetch absolutely crucial first frame sequentially
+      await fetchImage(indicesToLoad[0]);
+
+      // 2. Priority Batch: Load enough to cover the initial scroll descent safely
+      const priorityCount = isMobile ? 10 : 30;
+      const batch1 = indicesToLoad.slice(1, priorityCount).map(fetchImage);
       await Promise.all(batch1);
 
       if (isCancelled) return;
-      setLoaded(true);
+      setLoaded(true); // Unlock UI for user
 
-      // Async fetch remaining
-      const chunkSize = 15;
-      for (let i = 31; i <= FRAME_COUNT; i += chunkSize) {
+      // 3. Lazy Async fetch the remaining in micro-chunks to keep CPU/Network breathable
+      const chunkSize = isMobile ? 5 : 10;
+      for (let i = priorityCount; i < indicesToLoad.length; i += chunkSize) {
         if (isCancelled) break;
-        const chunk = [];
-        for (let j = i; j < i + chunkSize && j <= FRAME_COUNT; j++) chunk.push(fetchImage(j));
+        const chunk = indicesToLoad.slice(i, i + chunkSize).map(fetchImage);
         await Promise.all(chunk);
       }
     };
