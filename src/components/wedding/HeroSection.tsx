@@ -152,7 +152,7 @@ const HeroSection = () => {
   }, [loaded, currentFrameIndex]);
 
   return (
-    <div ref={containerRef} className="relative h-[500vh] bg-wedding-dark">
+    <div ref={containerRef} className={`relative ${isMobile ? "h-[200vh]" : "h-[500vh]"} bg-wedding-dark`}>
       {/* Sticky wrapper */}
       <div className="sticky top-0 h-screen w-full overflow-hidden hero-gradient bg-black">
         
