@@ -28,27 +28,31 @@ const HeroSection = () => {
   const isMobile = window.innerWidth < 768;
 
   const smoothProgress = useSpring(scrollYProgress, {
-    stiffness: isMobile ? 120 : 40, // Much snappier tracking on mobile touch
-    damping: isMobile ? 40 : 25,    // Tighter break to eliminate floating lag on mobile
+    stiffness: 40,
+    damping: 25,
     restDelta: 0.001,
   });
 
+  // RAW NATIVE SCROLL: Mobile gets 1:1 thumb pixel binding. 
+  // Eliminating 'useSpring' physics completely cures the "lag/delay" feeling on touch screens.
+  const activeProgress = isMobile ? scrollYProgress : smoothProgress;
+
   // Story Mapping interpolation: Mapping scroll uniformly for smooth sequence playback
   const currentFrameIndex = useTransform(
-    smoothProgress, 
+    activeProgress, 
     [0, 0.2, 0.6, 0.85, 1], 
     [1, 24, 72, 108, FRAME_COUNT]
   );
 
   // Typographic Opacity maps for the cinematic title (fades out as you scroll)
-  const titleOpacity = useTransform(smoothProgress, [0, 0.1, 0.15], [1, 0.5, 0]);
-  const titleScale = useTransform(smoothProgress, [0, 0.15], [1, 0.95]);
-  const titleY = useTransform(smoothProgress, [0, 0.15], ["0%", "-30%"]);
+  const titleOpacity = useTransform(activeProgress, [0, 0.1, 0.15], [1, 0.5, 0]);
+  const titleScale = useTransform(activeProgress, [0, 0.15], [1, 0.95]);
+  const titleY = useTransform(activeProgress, [0, 0.15], ["0%", "-30%"]);
 
   // Opacity maps for cinematic story layers later in the scroll
-  const text1Opacity = useTransform(smoothProgress, [0.18, 0.22, 0.4, 0.45], [0, 1, 1, 0]);
-  const text2Opacity = useTransform(smoothProgress, [0.45, 0.5, 0.75, 0.8], [0, 1, 1, 0]);
-  const text3Opacity = useTransform(smoothProgress, [0.85, 0.9, 1], [0, 1, 1]);
+  const text1Opacity = useTransform(activeProgress, [0.18, 0.22, 0.4, 0.45], [0, 1, 1, 0]);
+  const text2Opacity = useTransform(activeProgress, [0.45, 0.5, 0.75, 0.8], [0, 1, 1, 0]);
+  const text3Opacity = useTransform(activeProgress, [0.85, 0.9, 1], [0, 1, 1]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -86,8 +90,9 @@ const HeroSection = () => {
       // 1. Force fetch absolutely crucial first frame sequentially
       await fetchImage(indicesToLoad[0]);
 
-      // 2. Priority Batch: Load enough to cover the initial scroll descent safely
-      const priorityCount = isMobile ? 10 : 30;
+      // 2. Priority Batch: Network fetch lag freezes the frame. 
+      // We force mobile to cache 50% of the sequence heavily before unlocking UI to guarantee 0% network shudder.
+      const priorityCount = isMobile ? 60 : 30;
       const batch1 = indicesToLoad.slice(1, priorityCount).map(fetchImage);
       await Promise.all(batch1);
 
