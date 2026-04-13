@@ -7,7 +7,6 @@ import CoupleSection from "@/components/wedding/CoupleSection";
 import CountdownSection from "@/components/wedding/CountdownSection";
 import Footer from "@/components/wedding/Footer";
 import FloatingLamps from "@/components/wedding/FloatingLamps";
-import MusicToggle from "@/components/wedding/MusicToggle";
 
 const Index = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,9 +49,6 @@ const Index = () => {
 
       {/* Floating lamps */}
       <FloatingLamps />
-
-      {/* Music toggle */}
-      <MusicToggle />
 
       {/* Sections */}
       <HeroSection />

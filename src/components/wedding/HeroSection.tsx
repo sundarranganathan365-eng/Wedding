@@ -1,84 +1,188 @@
-import { useRef, useEffect, useState, useCallback } from "react";
-import templeImg from "@/assets/temple-hero.jpg";
-import FloatingLanterns from "./FloatingLanterns";
+import { useRef, useEffect, useState } from "react";
+import { useScroll, useSpring, useTransform, motion } from "framer-motion";
+
+const FRAME_COUNT = 120;
+const FRAME_PREFIX = '/Frames /ezgif-frame-';
+const FRAME_SUFFIX = '.jpg';
+
+function getFrameUrl(index: number) {
+  return `${FRAME_PREFIX}${index.toString().padStart(3, '0')}${FRAME_SUFFIX}`;
+}
 
 const HeroSection = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scrollProgress, setScrollProgress] = useState(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  const [loaded, setLoaded] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // Native scroll listener with requestAnimationFrame for buttery 60fps
-  const handleScroll = useCallback(() => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const scrollableHeight = containerRef.current.offsetHeight - window.innerHeight;
-    const rawProgress = Math.min(Math.max(-rect.top / scrollableHeight, 0), 1);
-    setScrollProgress(rawProgress);
-  }, []);
+  // Reference for holding preloaded bitmaps
+  const framesRef = useRef<(ImageBitmap | null)[]>(new Array(FRAME_COUNT + 1).fill(null));
+
+  // Framer Motion Scroll tracking
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"],
+  });
+
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 40, // Reduced for a heavier, cinematic drag
+    damping: 25,   // Increased to prevent bounce, smoothing out fast stops
+    restDelta: 0.001,
+  });
+
+  // Story Mapping interpolation: Mapping scroll uniformly for smooth sequence playback
+  const currentFrameIndex = useTransform(
+    smoothProgress, 
+    [0, 0.2, 0.6, 0.85, 1], 
+    [1, 24, 72, 108, FRAME_COUNT]
+  );
+
+  // Typographic Opacity maps for the cinematic title (fades out as you scroll)
+  const titleOpacity = useTransform(smoothProgress, [0, 0.1, 0.15], [1, 0.5, 0]);
+  const titleScale = useTransform(smoothProgress, [0, 0.15], [1, 0.95]);
+  const titleY = useTransform(smoothProgress, [0, 0.15], ["0%", "-30%"]);
+
+  // Opacity maps for cinematic story layers later in the scroll
+  const text1Opacity = useTransform(smoothProgress, [0.18, 0.22, 0.4, 0.45], [0, 1, 1, 0]);
+  const text2Opacity = useTransform(smoothProgress, [0.45, 0.5, 0.75, 0.8], [0, 1, 1, 0]);
+  const text3Opacity = useTransform(smoothProgress, [0.85, 0.9, 1], [0, 1, 1]);
 
   useEffect(() => {
-    let ticking = false;
-    const onScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          handleScroll();
-          ticking = false;
-        });
-        ticking = true;
+    let isCancelled = false;
+
+    const loadImages = async () => {
+      let loadedCount = 0;
+
+      const fetchImage = async (idx: number) => {
+        try {
+          const res = await fetch(getFrameUrl(idx));
+          if (!res.ok) throw new Error('Fetch failed');
+          const blob = await res.blob();
+          const bitmap = await createImageBitmap(blob);
+          if (!isCancelled) {
+            framesRef.current[idx] = bitmap;
+            loadedCount++;
+            setLoadingProgress(Math.round((loadedCount / FRAME_COUNT) * 100));
+          }
+        } catch (e) {
+          console.warn(`Failed to preload frame ${idx}`, e);
+        }
+      };
+
+      // Progressive caching: priority stream
+      const batch1 = [];
+      for (let i = 1; i <= 30; i++) batch1.push(fetchImage(i));
+      await Promise.all(batch1);
+
+      if (isCancelled) return;
+      setLoaded(true);
+
+      // Async fetch remaining
+      const chunkSize = 15;
+      for (let i = 31; i <= FRAME_COUNT; i += chunkSize) {
+        if (isCancelled) break;
+        const chunk = [];
+        for (let j = i; j < i + chunkSize && j <= FRAME_COUNT; j++) chunk.push(fetchImage(j));
+        await Promise.all(chunk);
       }
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    handleScroll(); // initial
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [handleScroll]);
 
-  // Derived values — pure math, no spring delay
-  const imageY = scrollProgress * -60; // vh units
-  const textOpacity = Math.max(1 - scrollProgress / 0.12, 0);
-  const textScale = 1 - Math.min(scrollProgress / 0.12, 1) * 0.05;
-  const textY = -12 - Math.min(scrollProgress / 0.12, 1) * 8; // vh units
+    loadImages();
+
+    return () => {
+      isCancelled = true;
+      framesRef.current.forEach(bmp => bmp && bmp.close());
+    };
+  }, []);
+
+  // Frame Renderer syncing canvas paint to scroll state
+  useEffect(() => {
+    if (!loaded || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
+
+    let animationFrameId: number;
+
+    const render = () => {
+      let index = Math.round(currentFrameIndex.get());
+      index = Math.max(1, Math.min(index, FRAME_COUNT));
+
+      // Display most recent cached frame if scanning too fast
+      while (!framesRef.current[index] && index > 1) {
+        index--;
+      }
+
+      const img = framesRef.current[index];
+
+      if (img) {
+        const { innerWidth, innerHeight } = window;
+        if (canvas.width !== innerWidth || canvas.height !== innerHeight) {
+          canvas.width = innerWidth;
+          canvas.height = innerHeight;
+        }
+
+        ctx.fillStyle = "#0a0a0a"; // Matches wedding-dark base
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const hRatio = canvas.width / img.width;
+        const vRatio = canvas.height / img.height;
+        const ratio = Math.max(hRatio, vRatio); // Use object-cover logic here for fully immersive hero
+
+        const centerShiftX = (canvas.width - img.width * ratio) / 2;
+        const centerShiftY = (canvas.height - img.height * ratio) / 2;
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          img.width,
+          img.height,
+          centerShiftX,
+          centerShiftY,
+          img.width * ratio,
+          img.height * ratio
+        );
+      }
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    animationFrameId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [loaded, currentFrameIndex]);
 
   return (
-    <div ref={containerRef} className="relative h-[300vh] bg-wedding-dark">
+    <div ref={containerRef} className="relative h-[500vh] bg-wedding-dark">
       {/* Sticky wrapper */}
-      <div className="sticky top-0 h-screen w-full overflow-hidden hero-gradient">
-
-        {/* Floating Lanterns / Deepam Effect */}
-        <FloatingLanterns />
-
-        {/* Temple Artwork: GPU-accelerated pan */}
-        <div className="absolute inset-0 z-[2] w-full h-full overflow-hidden">
-          <div
-            className="relative w-full h-[160vh] origin-top"
-            style={{
-              transform: `translate3d(0, ${imageY}vh, 0)`,
-              willChange: "transform",
-            }}
-          >
-            <img
-              src={templeImg}
-              alt="Sacred Temple Night View"
-              className="w-full h-full object-cover object-top"
-              loading="eager"
-              style={{
-                maskImage: "linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%)",
-                WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%)",
-              }}
-            />
+      <div className="sticky top-0 h-screen w-full overflow-hidden hero-gradient bg-black">
+        
+        {/* Preloader Phase */}
+        {!loaded && (
+          <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center text-wedding-gold-light/80 backdrop-blur-md bg-black w-full h-full">
+            <div className="w-12 h-12 border-2 border-wedding-gold-light/10 border-t-wedding-gold-light/80 rounded-full animate-spin mb-6" />
+            <p className="font-subtext text-xs tracking-[0.3em] font-light uppercase">
+              Preparing the Journey <span className="tabular-nums ml-2 font-mono opacity-60 text-[10px]">{loadingProgress}%</span>
+            </p>
           </div>
+        )}
+
+        {/* Canvas Scrollytelling */}
+        <div className="absolute inset-0 z-[2] w-full h-full overflow-hidden">
+          <canvas
+            ref={canvasRef}
+            className={`w-full h-full origin-top transition-opacity duration-1000 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          />
         </div>
 
-        {/* Night Gradients */}
+        {/* Night Gradients to blend UI */}
         <div className="absolute inset-0 z-[3] bg-gradient-to-t from-wedding-dark via-transparent to-transparent pointer-events-none" />
-        <div className="absolute inset-0 z-[3] bg-gradient-to-b from-black/60 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 z-[3] bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
 
-        {/* Main Content */}
-        <div
-          className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4"
-          style={{
-            opacity: textOpacity,
-            transform: `translate3d(0, ${textY}vh, 0) scale(${textScale})`,
-            willChange: "transform, opacity",
-          }}
+        {/* The Initial Main Content / Typography */}
+        <motion.div
+          style={{ opacity: titleOpacity, scale: titleScale, y: titleY }}
+          className="relative z-[20] flex flex-col items-center justify-center h-full text-center px-4"
         >
           {/* Tamil blessing */}
           <p className="font-tamil text-wedding-gold-light/90 text-xs sm:text-sm md:text-lg mb-3 md:mb-4 tracking-widest drop-shadow-md">
@@ -108,15 +212,36 @@ const HeroSection = () => {
               29 . 05 . 2026
             </p>
           </div>
-        </div>
+          
+          {/* Scroll Hint */}
+          <div className="absolute -bottom-32 flex flex-col items-center gap-2">
+            <span className="font-subtext text-wedding-gold-light/40 text-[9px] md:text-[10px] tracking-[0.4em] uppercase">Scroll to Reveal</span>
+            <div className="w-[1px] h-8 md:h-10 bg-gradient-to-b from-wedding-gold-light/40 to-transparent animate-pulse" />
+          </div>
+        </motion.div>
 
-        {/* Scroll Hint */}
-        <div
-          className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2"
-          style={{ opacity: textOpacity, willChange: "opacity" }}
-        >
-          <span className="font-subtext text-wedding-gold-light/40 text-[9px] md:text-[10px] tracking-[0.4em] uppercase">Scroll to Reveal</span>
-          <div className="w-[1px] h-8 md:h-10 bg-gradient-to-b from-wedding-gold-light/40 to-transparent animate-pulse" />
+        {/* Cinematic Scrollytelling Layers during descent */}
+        <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none z-[15] flex flex-col items-center justify-end pb-24 md:pb-32">
+          
+          <motion.div style={{ opacity: text1Opacity }} className="absolute bottom-32 text-center max-w-lg px-6">
+            <h2 className="text-wedding-gold-light font-heading text-xl md:text-3xl tracking-[0.3em] font-light mb-3">THE ASCENT</h2>
+            <p className="text-wedding-ivory/60 font-subtext text-sm md:text-base tracking-widest uppercase">Approaching the sacred gopuram</p>
+          </motion.div>
+
+          <motion.div style={{ opacity: text2Opacity }} className="absolute bottom-32 text-center max-w-lg px-6">
+            <h2 className="text-wedding-gold-light font-heading text-xl md:text-3xl tracking-[0.3em] font-light mb-3">THE INNER SANCTUM</h2>
+            <p className="text-wedding-ivory/60 font-subtext text-sm md:text-base tracking-widest uppercase">Descending into a realm of peace</p>
+          </motion.div>
+
+          <motion.div style={{ opacity: text3Opacity }} className="absolute bottom-32 text-center max-w-lg px-6">
+            <h2 className="text-wedding-gold-light font-heading text-2xl md:text-4xl tracking-[0.4em] font-semibold mb-4 drop-shadow-2xl">OM SARAVANABHAVA</h2>
+            <p className="text-wedding-ivory/80 font-subtext flex items-center justify-center gap-4 text-xs tracking-[0.4em] uppercase">
+               <span className="w-8 h-[1px] bg-wedding-gold-light/50" />
+               Lord Murugan Revealed
+               <span className="w-8 h-[1px] bg-wedding-gold-light/50" />
+            </p>
+          </motion.div>
+
         </div>
       </div>
     </div>
