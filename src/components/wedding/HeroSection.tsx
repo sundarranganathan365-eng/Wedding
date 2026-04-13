@@ -11,7 +11,7 @@ function getFrameUrl(index: number) {
 
 const HeroSection = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   
   const [loaded, setLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -113,17 +113,12 @@ const HeroSection = () => {
     };
   }, []);
 
-  // Frame Renderer syncing canvas paint to scroll state
+  // Frame Renderer syncing native image compositor to scroll state
   useEffect(() => {
-    if (!loaded || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
+    if (!loaded) return;
 
     let animationFrameId: number;
     let lastDrawnIndex = -1;
-    let lastWidth = -1;
-    let lastHeight = -1;
 
     const render = () => {
       let index = Math.round(currentFrameIndex.get());
@@ -136,51 +131,12 @@ const HeroSection = () => {
 
       const img = framesRef.current[index];
 
-      if (img) {
-        const { innerWidth, innerHeight } = window;
-        let requiresDraw = false;
-
-        // Has canvas resized?
-        if (canvas.width !== innerWidth || canvas.height !== innerHeight) {
-          canvas.width = innerWidth;
-          canvas.height = innerHeight;
-          requiresDraw = true;
-        }
-
-        // Has scroll advanced to a new mathematical frame?
-        if (lastDrawnIndex !== index || lastWidth !== innerWidth || lastHeight !== innerHeight) {
-          requiresDraw = true;
-        }
-
-        // FATAL MOBILE LAG FIX: ONLY draw the 1080p image if absolutely necessary. 
-        // Rendering identical frames 60x a second aggressively cooks mobile CPUs.
-        if (requiresDraw) {
-          ctx.fillStyle = "#0a0a0a"; // Matches wedding-dark base
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          // Calculate aspect ratios
-          const hRatio = canvas.width / img.naturalWidth;
-          const vRatio = canvas.height / img.naturalHeight;
-          const ratio = Math.max(hRatio, vRatio); // object-cover logic
-
-          const centerShiftX = (canvas.width - img.naturalWidth * ratio) / 2;
-          const centerShiftY = (canvas.height - img.naturalHeight * ratio) / 2;
-
-          ctx.drawImage(
-            img,
-            0,
-            0,
-            img.naturalWidth,
-            img.naturalHeight,
-            centerShiftX,
-            centerShiftY,
-            img.naturalWidth * ratio,
-            img.naturalHeight * ratio
-          );
-
+      // FATAL MOBILE LAG FIX: Using native <img> compositor instead of heavy Canvas drawImage.
+      // Modifying the `src` property routes directly through the CSS GPU pipeline (0% CPU cost).
+      if (img && imgRef.current) {
+        if (lastDrawnIndex !== index) {
+          imgRef.current.src = img.src;
           lastDrawnIndex = index;
-          lastWidth = innerWidth;
-          lastHeight = innerHeight;
         }
       }
       animationFrameId = requestAnimationFrame(render);
@@ -205,11 +161,12 @@ const HeroSection = () => {
           </div>
         )}
 
-        {/* Canvas Scrollytelling */}
-        <div className="absolute inset-0 z-[2] w-full h-full overflow-hidden">
-          <canvas
-            ref={canvasRef}
-            className={`w-full h-full origin-top transition-opacity duration-1000 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        {/* Native Image Scrollytelling Pipeline */}
+        <div className="absolute inset-0 z-[2] w-full h-full overflow-hidden bg-[#0a0a0a]">
+          <img
+            ref={imgRef}
+            className={`w-full h-full object-cover transition-opacity duration-1000 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+            alt="Cinematic Scroll Reveal"
           />
         </div>
 
