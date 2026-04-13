@@ -40,9 +40,19 @@ const HeroSection = () => {
   // Story Mapping interpolation: Mapping scroll uniformly for smooth sequence playback
   const currentFrameIndex = useTransform(
     activeProgress, 
-    [0, 1], 
-    [1, FRAME_COUNT]
+    [0, 0.2, 0.6, 0.85, 1], 
+    [1, 24, 72, 108, FRAME_COUNT]
   );
+
+  // Typographic Opacity maps for the cinematic title (fades out as you scroll)
+  const titleOpacity = useTransform(activeProgress, [0, 0.1, 0.15], [1, 0.5, 0]);
+  const titleScale = useTransform(activeProgress, [0, 0.15], [1, 0.95]);
+  const titleY = useTransform(activeProgress, [0, 0.15], ["0%", "-30%"]);
+
+  // Opacity maps for cinematic story layers later in the scroll
+  const text1Opacity = useTransform(activeProgress, [0.18, 0.22, 0.4, 0.45], [0, 1, 1, 0]);
+  const text2Opacity = useTransform(activeProgress, [0.45, 0.5, 0.75, 0.8], [0, 1, 1, 0]);
+  const text3Opacity = useTransform(activeProgress, [0.85, 0.9, 1], [0, 1, 1]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -114,9 +124,8 @@ const HeroSection = () => {
 
     let animationFrameId: number;
     let lastDrawnIndex = -1;
-    let lastDrawTime = 0;
 
-    const render = (time: number) => {
+    const render = () => {
       let index = Math.round(currentFrameIndex.get());
       index = Math.max(1, Math.min(index, FRAME_COUNT));
 
@@ -128,16 +137,11 @@ const HeroSection = () => {
       const img = framesRef.current[index];
 
       // FATAL MOBILE LAG FIX: Using native <img> compositor instead of heavy Canvas drawImage.
+      // Modifying the `src` property routes directly through the CSS GPU pipeline (0% CPU cost).
       if (img && imgRef.current) {
         if (lastDrawnIndex !== index) {
-          const timeSinceLastDraw = time - lastDrawTime;
-          
-          // Limit mobile decoding specifically to ~30 FPS to stop 1080p JPEGs from thermal throttling the CPU
-          if (!isMobile || timeSinceLastDraw > 30) {
-            imgRef.current.src = img.src;
-            lastDrawnIndex = index;
-            lastDrawTime = time;
-          }
+          imgRef.current.src = img.src;
+          lastDrawnIndex = index;
         }
       }
       animationFrameId = requestAnimationFrame(render);
@@ -175,12 +179,70 @@ const HeroSection = () => {
         <div className="absolute inset-0 z-[3] bg-gradient-to-t from-wedding-dark via-transparent to-transparent pointer-events-none" />
         <div className="absolute inset-0 z-[3] bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
 
-        {/* 
-          No explicit React typography overlays are needed here because the 
-          user has brilliantly baked all typography seamlessly into the 120 video frames itself! 
-          Rendering duplicate text creates a ghosting effect that mimics stutter/lag.
-        */}
-        
+        {/* The Initial Main Content / Typography */}
+        <motion.div
+          style={{ opacity: titleOpacity, scale: titleScale, y: titleY }}
+          className="relative z-[20] flex flex-col items-center justify-center h-full text-center px-4"
+        >
+          {/* Tamil blessing */}
+          <p className="font-tamil text-wedding-gold-light/90 text-xs sm:text-sm md:text-lg mb-3 md:mb-4 tracking-widest drop-shadow-md">
+            ஓம் ஸ்ரீ கணேஷாய நமஹ
+          </p>
+
+          <div className="flex items-center gap-4 md:gap-6 mb-4 md:mb-8 opacity-60">
+            <div className="w-8 md:w-12 h-[1px] bg-wedding-gold-light" />
+            <div className="w-2 h-2 rounded-full border border-wedding-gold-light" />
+            <div className="w-8 md:w-12 h-[1px] bg-wedding-gold-light" />
+          </div>
+
+          <div className="flex flex-col gap-1 md:gap-4 mb-4 md:mb-8">
+            <h1 className="font-display text-4xl sm:text-5xl md:text-8xl lg:text-9xl text-wedding-gold-light drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)] tracking-[0.15em] md:tracking-[0.2em] uppercase">
+              The Bride
+            </h1>
+            <div className="flex items-center justify-center gap-4">
+              <span className="font-heading text-wedding-gold-light/60 text-base md:text-xl tracking-[0.5em] uppercase">Weds</span>
+            </div>
+            <h1 className="font-display text-4xl sm:text-5xl md:text-8xl lg:text-9xl text-wedding-gold-light drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)] tracking-[0.15em] md:tracking-[0.2em] uppercase">
+              The Groom
+            </h1>
+          </div>
+
+          <div className="mt-2 md:mt-4 px-6 md:px-8 py-2 md:py-3 border-y border-wedding-gold-light/20 bg-black/40 backdrop-blur-md">
+            <p className="font-subtext text-wedding-ivory text-lg md:text-2xl tracking-[0.2em] md:tracking-[0.3em]">
+              29 . 05 . 2026
+            </p>
+          </div>
+          
+          {/* Scroll Hint */}
+          <div className="absolute -bottom-32 flex flex-col items-center gap-2">
+            <span className="font-subtext text-wedding-gold-light/40 text-[9px] md:text-[10px] tracking-[0.4em] uppercase">Scroll to Reveal</span>
+            <div className="w-[1px] h-8 md:h-10 bg-gradient-to-b from-wedding-gold-light/40 to-transparent animate-pulse" />
+          </div>
+        </motion.div>
+
+        {/* Cinematic Scrollytelling Layers during descent */}
+        <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none z-[15] flex flex-col items-center justify-end pb-24 md:pb-32">
+          
+          <motion.div style={{ opacity: text1Opacity }} className="absolute bottom-32 text-center max-w-lg px-6">
+            <h2 className="text-wedding-gold-light font-heading text-xl md:text-3xl tracking-[0.3em] font-light mb-3">THE ASCENT</h2>
+            <p className="text-wedding-ivory/60 font-subtext text-sm md:text-base tracking-widest uppercase">Approaching the sacred gopuram</p>
+          </motion.div>
+
+          <motion.div style={{ opacity: text2Opacity }} className="absolute bottom-32 text-center max-w-lg px-6">
+            <h2 className="text-wedding-gold-light font-heading text-xl md:text-3xl tracking-[0.3em] font-light mb-3">THE INNER SANCTUM</h2>
+            <p className="text-wedding-ivory/60 font-subtext text-sm md:text-base tracking-widest uppercase">Descending into a realm of peace</p>
+          </motion.div>
+
+          <motion.div style={{ opacity: text3Opacity }} className="absolute bottom-32 text-center max-w-lg px-6">
+            <h2 className="text-wedding-gold-light font-heading text-2xl md:text-4xl tracking-[0.4em] font-semibold mb-4 drop-shadow-2xl">OM SARAVANABHAVA</h2>
+            <p className="text-wedding-ivory/80 font-subtext flex items-center justify-center gap-4 text-xs tracking-[0.4em] uppercase">
+               <span className="w-8 h-[1px] bg-wedding-gold-light/50" />
+               Lord Murugan Revealed
+               <span className="w-8 h-[1px] bg-wedding-gold-light/50" />
+            </p>
+          </motion.div>
+
+        </div>
       </div>
     </div>
   );

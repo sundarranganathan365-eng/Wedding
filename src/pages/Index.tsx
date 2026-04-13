@@ -6,6 +6,7 @@ import EventsSection from "@/components/wedding/EventsSection";
 import CoupleSection from "@/components/wedding/CoupleSection";
 import CountdownSection from "@/components/wedding/CountdownSection";
 import Footer from "@/components/wedding/Footer";
+import FloatingLamps from "@/components/wedding/FloatingLamps";
 
 const Index = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +46,9 @@ const Index = () => {
     <div ref={containerRef} className="relative">
       {/* Scroll progress bar */}
       <div id="scroll-progress" className="scroll-progress" style={{ width: "0%" }} />
+
+      {/* Floating lamps */}
+      <FloatingLamps />
 
       {/* Sections */}
       <HeroSection />
