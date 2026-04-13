@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { useScroll, useSpring, useTransform, motion } from "framer-motion";
 
 const FRAME_COUNT = 120;
-const FRAME_PREFIX = '/Frames /ezgif-frame-';
+const FRAME_PREFIX = '/Frames/ezgif-frame-';
 const FRAME_SUFFIX = '.jpg';
 
 function getFrameUrl(index: number) {
