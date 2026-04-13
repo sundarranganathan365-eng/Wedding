@@ -16,8 +16,8 @@ const HeroSection = () => {
   const [loaded, setLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // Reference for holding preloaded bitmaps
-  const framesRef = useRef<(ImageBitmap | null)[]>(new Array(FRAME_COUNT + 1).fill(null));
+  // Reference for holding preloaded image elements natively (Mobile Safari memory optimized)
+  const framesRef = useRef<(HTMLImageElement | null)[]>(new Array(FRAME_COUNT + 1).fill(null));
 
   // Framer Motion Scroll tracking
   const { scrollYProgress } = useScroll({
@@ -56,15 +56,19 @@ const HeroSection = () => {
 
       const fetchImage = async (idx: number) => {
         try {
-          const res = await fetch(getFrameUrl(idx));
-          if (!res.ok) throw new Error('Fetch failed');
-          const blob = await res.blob();
-          const bitmap = await createImageBitmap(blob);
-          if (!isCancelled) {
-            framesRef.current[idx] = bitmap;
-            loadedCount++;
-            setLoadingProgress(Math.round((loadedCount / FRAME_COUNT) * 100));
-          }
+          const img = new Image();
+          img.src = getFrameUrl(idx);
+          await new Promise((resolve, reject) => {
+            img.onload = () => {
+              if (!isCancelled) {
+                framesRef.current[idx] = img;
+                loadedCount++;
+                setLoadingProgress(Math.round((loadedCount / FRAME_COUNT) * 100));
+              }
+              resolve(true);
+            };
+            img.onerror = reject;
+          });
         } catch (e) {
           console.warn(`Failed to preload frame ${idx}`, e);
         }
@@ -92,7 +96,9 @@ const HeroSection = () => {
 
     return () => {
       isCancelled = true;
-      framesRef.current.forEach(bmp => bmp && bmp.close());
+      framesRef.current.forEach(img => {
+        if (img) img.src = "";
+      });
     };
   }, []);
 
@@ -126,23 +132,24 @@ const HeroSection = () => {
         ctx.fillStyle = "#0a0a0a"; // Matches wedding-dark base
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const hRatio = canvas.width / img.width;
-        const vRatio = canvas.height / img.height;
-        const ratio = Math.max(hRatio, vRatio); // Use object-cover logic here for fully immersive hero
+        // Calculate aspect ratios
+        const hRatio = canvas.width / img.naturalWidth;
+        const vRatio = canvas.height / img.naturalHeight;
+        const ratio = Math.max(hRatio, vRatio); // object-cover logic
 
-        const centerShiftX = (canvas.width - img.width * ratio) / 2;
-        const centerShiftY = (canvas.height - img.height * ratio) / 2;
+        const centerShiftX = (canvas.width - img.naturalWidth * ratio) / 2;
+        const centerShiftY = (canvas.height - img.naturalHeight * ratio) / 2;
 
         ctx.drawImage(
           img,
           0,
           0,
-          img.width,
-          img.height,
+          img.naturalWidth,
+          img.naturalHeight,
           centerShiftX,
           centerShiftY,
-          img.width * ratio,
-          img.height * ratio
+          img.naturalWidth * ratio,
+          img.naturalHeight * ratio
         );
       }
       animationFrameId = requestAnimationFrame(render);
