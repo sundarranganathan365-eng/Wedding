@@ -40,8 +40,8 @@ const HeroSection = () => {
   // Story Mapping interpolation: Mapping scroll uniformly for smooth sequence playback
   const currentFrameIndex = useTransform(
     activeProgress, 
-    [0, 0.2, 0.6, 0.85, 1], 
-    [1, 24, 72, 108, FRAME_COUNT]
+    [0, 1], 
+    [1, FRAME_COUNT]
   );
 
   // Typographic Opacity maps for the cinematic title (fades out as you scroll)
@@ -124,8 +124,9 @@ const HeroSection = () => {
 
     let animationFrameId: number;
     let lastDrawnIndex = -1;
+    let lastDrawTime = 0;
 
-    const render = () => {
+    const render = (time: number) => {
       let index = Math.round(currentFrameIndex.get());
       index = Math.max(1, Math.min(index, FRAME_COUNT));
 
@@ -137,11 +138,17 @@ const HeroSection = () => {
       const img = framesRef.current[index];
 
       // FATAL MOBILE LAG FIX: Using native <img> compositor instead of heavy Canvas drawImage.
-      // Modifying the `src` property routes directly through the CSS GPU pipeline (0% CPU cost).
       if (img && imgRef.current) {
         if (lastDrawnIndex !== index) {
-          imgRef.current.src = img.src;
-          lastDrawnIndex = index;
+          const timeSinceLastDraw = time - lastDrawTime;
+          
+          // STRICT MOBILE LAG FIX: Cap decoding rate to 24FPS (40ms) so Safari doesn't freeze the UI 
+          // thread trying to synchronously decode 1080p images 60 times a second.
+          if (!isMobile || timeSinceLastDraw >= 40) {
+            imgRef.current.src = img.src;
+            lastDrawnIndex = index;
+            lastDrawTime = time;
+          }
         }
       }
       animationFrameId = requestAnimationFrame(render);
@@ -170,6 +177,7 @@ const HeroSection = () => {
         <div className="absolute inset-0 z-[2] w-full h-full overflow-hidden bg-[#0a0a0a]">
           <img
             ref={imgRef}
+            decoding="async"
             className={`w-full h-full object-cover transition-opacity duration-1000 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             alt="Cinematic Scroll Reveal"
           />
