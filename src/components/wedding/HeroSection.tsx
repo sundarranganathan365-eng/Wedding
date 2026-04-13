@@ -25,9 +25,11 @@ const HeroSection = () => {
     offset: ["start start", "end end"],
   });
 
+  const isMobile = window.innerWidth < 768;
+
   const smoothProgress = useSpring(scrollYProgress, {
-    stiffness: 40, // Reduced for a heavier, cinematic drag
-    damping: 25,   // Increased to prevent bounce, smoothing out fast stops
+    stiffness: isMobile ? 120 : 40, // Much snappier tracking on mobile touch
+    damping: isMobile ? 40 : 25,    // Tighter break to eliminate floating lag on mobile
     restDelta: 0.001,
   });
 
@@ -54,12 +56,9 @@ const HeroSection = () => {
     const loadImages = async () => {
       let loadedCount = 0;
       
-      // Dynamic memory scaling: Skip frames on mobile to prevent lag and RAM exhaustion
-      const isMobile = window.innerWidth < 768;
-      const step = isMobile ? 3 : 1; 
-      
+      // Load all frames to ensure 60fps visual smoothness without frame-skipping chop
       const indicesToLoad: number[] = [];
-      for (let i = 1; i <= FRAME_COUNT; i += step) {
+      for (let i = 1; i <= FRAME_COUNT; i++) {
         indicesToLoad.push(i);
       }
       const totalToLoad = indicesToLoad.length;
@@ -122,6 +121,9 @@ const HeroSection = () => {
     if (!ctx) return;
 
     let animationFrameId: number;
+    let lastDrawnIndex = -1;
+    let lastWidth = -1;
+    let lastHeight = -1;
 
     const render = () => {
       let index = Math.round(currentFrameIndex.get());
@@ -136,33 +138,50 @@ const HeroSection = () => {
 
       if (img) {
         const { innerWidth, innerHeight } = window;
+        let requiresDraw = false;
+
+        // Has canvas resized?
         if (canvas.width !== innerWidth || canvas.height !== innerHeight) {
           canvas.width = innerWidth;
           canvas.height = innerHeight;
+          requiresDraw = true;
         }
 
-        ctx.fillStyle = "#0a0a0a"; // Matches wedding-dark base
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Has scroll advanced to a new mathematical frame?
+        if (lastDrawnIndex !== index || lastWidth !== innerWidth || lastHeight !== innerHeight) {
+          requiresDraw = true;
+        }
 
-        // Calculate aspect ratios
-        const hRatio = canvas.width / img.naturalWidth;
-        const vRatio = canvas.height / img.naturalHeight;
-        const ratio = Math.max(hRatio, vRatio); // object-cover logic
+        // FATAL MOBILE LAG FIX: ONLY draw the 1080p image if absolutely necessary. 
+        // Rendering identical frames 60x a second aggressively cooks mobile CPUs.
+        if (requiresDraw) {
+          ctx.fillStyle = "#0a0a0a"; // Matches wedding-dark base
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const centerShiftX = (canvas.width - img.naturalWidth * ratio) / 2;
-        const centerShiftY = (canvas.height - img.naturalHeight * ratio) / 2;
+          // Calculate aspect ratios
+          const hRatio = canvas.width / img.naturalWidth;
+          const vRatio = canvas.height / img.naturalHeight;
+          const ratio = Math.max(hRatio, vRatio); // object-cover logic
 
-        ctx.drawImage(
-          img,
-          0,
-          0,
-          img.naturalWidth,
-          img.naturalHeight,
-          centerShiftX,
-          centerShiftY,
-          img.naturalWidth * ratio,
-          img.naturalHeight * ratio
-        );
+          const centerShiftX = (canvas.width - img.naturalWidth * ratio) / 2;
+          const centerShiftY = (canvas.height - img.naturalHeight * ratio) / 2;
+
+          ctx.drawImage(
+            img,
+            0,
+            0,
+            img.naturalWidth,
+            img.naturalHeight,
+            centerShiftX,
+            centerShiftY,
+            img.naturalWidth * ratio,
+            img.naturalHeight * ratio
+          );
+
+          lastDrawnIndex = index;
+          lastWidth = innerWidth;
+          lastHeight = innerHeight;
+        }
       }
       animationFrameId = requestAnimationFrame(render);
     };
